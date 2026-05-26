@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import csv
+import io
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from app.models import ReportListResponse, ReportPublic, ReportStatus
 from app.reports import query
@@ -50,4 +53,43 @@ def list_reports(
         total=len(rows),
         offset=offset,
         limit=limit,
+    )
+
+
+@app.get("/reports/export")
+def export_reports(
+    status: ReportStatus | None = Query(None, description="Filter by status"),
+    date_from: datetime | None = Query(None, description="Lower bound on created_at (inclusive)"),
+    date_to: datetime | None = Query(None, description="Upper bound on created_at (inclusive)"),
+    sort: str = Query("created_at", description="Sort field"),
+    descending: bool = Query(True, description="Sort descending"),
+) -> StreamingResponse:
+    """Export all matching reports as a CSV file.
+
+    No pagination — returns every row that matches the filter.
+    Public fields only; internal_id and owner_email are never included.
+    """
+    try:
+        rows = query(
+            status=status,
+            date_from=date_from,
+            date_to=date_to,
+            sort=sort,
+            descending=descending,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    buf = io.StringIO()
+    writer = csv.writer(buf, quoting=csv.QUOTE_ALL)
+    writer.writerow(["id", "title", "status", "owner", "amount", "created_at"])
+    for r in rows:
+        pub = ReportPublic.from_internal(r)
+        writer.writerow([pub.id, pub.title, pub.status, pub.owner, pub.amount, pub.created_at.isoformat()])
+
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="reports.csv"'},
     )
