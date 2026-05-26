@@ -6,7 +6,7 @@ from the HTTP layer (`main.py`) so it can be reused by any future export feature
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterable
 
 from app.data import all_reports
@@ -34,8 +34,12 @@ def query(
     if status is not None:
         rows = (r for r in rows if r.status == status)
     if date_from is not None:
-        rows = (r for r in rows if r.created_at >= date_from)
+        # Ensure timezone-aware comparison by adding UTC if naive
+        date_from_aware = date_from if date_from.tzinfo is not None else date_from.replace(tzinfo=timezone.utc)
+        rows = (r for r in rows if r.created_at >= date_from_aware)
     if date_to is not None:
-        rows = (r for r in rows if r.created_at <= date_to)
+        # Ensure timezone-aware comparison by adding UTC if naive
+        date_to_aware = date_to if date_to.tzinfo is not None else date_to.replace(tzinfo=timezone.utc)
+        rows = (r for r in rows if r.created_at <= date_to_aware)
 
     return sorted(rows, key=lambda r: getattr(r, sort), reverse=descending)

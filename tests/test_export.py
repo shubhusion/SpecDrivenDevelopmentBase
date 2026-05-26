@@ -61,3 +61,21 @@ def test_export_filter_by_status():
 def test_export_invalid_sort_returns_400():
     response = client.get("/reports/export?sort=not_a_field")
     assert response.status_code == 400
+
+
+def test_export_date_range_filter():
+    from app.data import all_reports as _all_reports
+    all_internal = _all_reports()
+    dates = [r.created_at for r in all_internal]
+    mid = sorted(dates)[len(dates) // 2]
+    date_str = mid.isoformat()
+
+    rows = _parse_csv(client.get("/reports/export", params={"date_to": date_str}).text)
+    assert all(r["created_at"] <= date_str for r in rows)
+    assert len(rows) > 0
+
+
+def test_export_sort_ascending_by_amount():
+    rows = _parse_csv(client.get("/reports/export?sort=amount&descending=false").text)
+    amounts = [float(r["amount"]) for r in rows]
+    assert amounts == sorted(amounts)

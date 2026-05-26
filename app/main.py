@@ -7,7 +7,7 @@ import io
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response
 
 from app.models import ReportListResponse, ReportPublic, ReportStatus
 from app.reports import query
@@ -63,7 +63,7 @@ def export_reports(
     date_to: datetime | None = Query(None, description="Upper bound on created_at (inclusive)"),
     sort: str = Query("created_at", description="Sort field"),
     descending: bool = Query(True, description="Sort descending"),
-) -> StreamingResponse:
+) -> Response:
     """Export all matching reports as a CSV file.
 
     No pagination — returns every row that matches the filter.
@@ -87,9 +87,8 @@ def export_reports(
         pub = ReportPublic.from_internal(r)
         writer.writerow([pub.id, pub.title, pub.status, pub.owner, pub.amount, pub.created_at.isoformat()])
 
-    buf.seek(0)
-    return StreamingResponse(
-        iter([buf.getvalue()]),
+    return Response(
+        content=buf.getvalue(),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="reports.csv"'},
     )
