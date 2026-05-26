@@ -30,12 +30,14 @@ def test_export_content_disposition():
 def test_export_columns():
     response = client.get("/reports/export")
     rows = _parse_csv(response.text)
+    assert len(rows) > 0, "Expected at least one data row in CSV"
     assert list(rows[0].keys()) == ["id", "title", "status", "owner", "amount", "created_at"]
 
 
 def test_export_no_internal_fields():
     response = client.get("/reports/export")
     rows = _parse_csv(response.text)
+    assert len(rows) > 0, "Expected at least one data row in CSV"
     for row in rows:
         assert "internal_id" not in row
         assert "owner_email" not in row
